@@ -163,7 +163,7 @@ function App() {
           <Paper elevation={3} sx={{ height: '100%', overflow: 'hidden', p: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
-                Network Data
+                Relationship Data
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                 <TextField
