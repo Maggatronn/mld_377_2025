@@ -54,7 +54,8 @@ function ForceGraph({ data, searchTerm }) {
         id,
         x: width / 2 + (Math.random() - 0.5) * 100,  // Add initial positions
         y: height / 2 + (Math.random() - 0.5) * 100,
-        leadership: latestLeadership[id]?.leadership || null  // Add leadership level if available
+        leadership: latestLeadership[id]?.leadership || null,  // Add leadership level if available
+        isOrganizer: filteredData.some(d => d.organizer === id)  // Add flag for organizers
       }));
 
     // Count frequency of connections between pairs
@@ -67,18 +68,41 @@ function ForceGraph({ data, searchTerm }) {
     });
 
     // Create links from the filtered data with connection counts
-    const links = filteredData
-      .filter(d => d.organizer && d.organizee)  // Only create links if both fields exist
-      .map(d => {
+    const links = [];
+    
+    // Add organizer-organizee links
+    filteredData
+      .filter(d => d.organizer && d.organizee)
+      .forEach(d => {
         const key = [d.organizer, d.organizee].sort().join('-');
-        return {
-          source: d.organizer,
-          target: d.organizee,
-          date: d.date,
-          event: d.event,
-          count: connectionCounts[key]
-        };
+        const existingLink = links.find(l => 
+          (l.source === d.organizer && l.target === d.organizee) ||
+          (l.source === d.organizee && l.target === d.organizer)
+        );
+        if (!existingLink) {
+          links.push({
+            source: d.organizer,
+            target: d.organizee,
+            date: d.date,
+            event: d.event,
+            count: connectionCounts[key],
+            type: 'organizer-organizee'
+          });
+        }
       });
+
+    // Add organizer-organizer links
+    const organizers = nodes.filter(n => n.isOrganizer).map(n => n.id);
+    for (let i = 0; i < organizers.length; i++) {
+      for (let j = i + 1; j < organizers.length; j++) {
+        links.push({
+          source: organizers[i],
+          target: organizers[j],
+          count: 1,
+          type: 'organizer-organizer'
+        });
+      }
+    }
 
     // Get max connection count for scaling
     const maxCount = Math.max(...Object.values(connectionCounts), 1);
@@ -113,21 +137,22 @@ function ForceGraph({ data, searchTerm }) {
     const simulation = d3.forceSimulation(nodes)
       .force('link', d3.forceLink(links)
         .id(d => d.id)
-        .distance(d => strengthScale(d.count)))
+        .distance(d => d.type === 'organizer-organizer' ? 150 : strengthScale(d.count)))
       .force('charge', d3.forceManyBody().strength(-100))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(40))
       .force('x', d3.forceX(width / 2).strength(0.1))
       .force('y', d3.forceY(height / 2).strength(0.1));
 
-    // Add links with varying thickness
+    // Add links with varying thickness and style
     const link = g.append('g')
       .selectAll('line')
       .data(links)
       .join('line')
-      .style('stroke', '#999')
-      .style('stroke-opacity', 0.6)
-      .style('stroke-width', d => widthScale(d.count));
+      .style('stroke', d => d.type === 'organizer-organizer' ? '#ddd' : '#999')
+      .style('stroke-opacity', d => d.type === 'organizer-organizer' ? 0.3 : 0.6)
+      .style('stroke-width', d => d.type === 'organizer-organizer' ? 1 : widthScale(d.count))
+      .style('stroke-dasharray', d => d.type === 'organizer-organizer' ? '5,5' : 'none');
 
     // Create node groups
     const node = g.append('g')
